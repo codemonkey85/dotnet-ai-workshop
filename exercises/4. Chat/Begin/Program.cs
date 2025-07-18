@@ -33,9 +33,9 @@ var propertyListings = new[]
     "For Sale: A 3-bedroom fixer-upper in Neumann. This property has great potential with a little TLC. The house features a spacious living room, a kitchen with ample storage, and a large backyard. The neighborhood is undergoing revitalization, with new development projects and community initiatives aimed at improving the area. Close to schools and public transport, this is a great opportunity for investors or first-time buyers. Minimum offer price: $250,000. Contact Future Homes Realty at (555) 654-3210 for more information.",
 };
 
-var jsonShape = GenerateJsonShape(typeof(PropertyDetails));
+var jsonShape = GenerateJsonShape<PropertyDetails>();
 var systemMessage = $$"""
-    Extract information from the following property listing.
+    Extract information from the following text.
 
     Respond in JSON with the following shape:
     {{jsonShape}}
@@ -59,38 +59,21 @@ foreach (var listingText in propertyListings)
     }
 }
 
-static string GenerateJsonShape(Type type)
+static string GenerateJsonShape<T>()
 {
     string GetJsonType(Type t)
     {
         t = Nullable.GetUnderlyingType(t) ?? t;
 
-        if (t.IsEnum)
+        return t switch
         {
-            return "string"; // Will be serialized as a string due to JsonStringEnumConverter
-        }
-
-        if (t == typeof(string))
-        {
-            return "string";
-        }
-
-        if (t == typeof(int) || t == typeof(long) || t == typeof(float) || t == typeof(double) || t == typeof(decimal))
-        {
-            return "number";
-        }
-
-        if (t == typeof(bool))
-        {
-            return "boolean";
-        }
-
-        if (t.IsArray)
-        {
-            return $"[{GetJsonType(t.GetElementType()!)}]";
-        }
-
-        return "object";
+            var type when type.IsEnum => "string", // Will be serialized as a string due to JsonStringEnumConverter
+            var type when type == typeof(string) => "string",
+            var type when type == typeof(int) || type == typeof(long) || type == typeof(float) || type == typeof(double) || type == typeof(decimal) => "number",
+            var type when type == typeof(bool) => "boolean",
+            var type when type.IsArray => $"[{GetJsonType(type.GetElementType()!)}]",
+            _ => "object"
+        };
     }
 
     string GetEnumComment(Type t)
@@ -100,6 +83,8 @@ static string GenerateJsonShape(Type type)
             ? $" // one of: {string.Join(", ", Enum.GetNames(t).Select(n => $"\"{n}\""))}"
             : string.Empty;
     }
+
+    var type = typeof(T);
 
     var props = type.GetProperties();
     var lines = props.Select(p =>
