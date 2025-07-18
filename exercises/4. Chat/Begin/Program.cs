@@ -6,7 +6,7 @@ builder.Configuration.AddUserSecrets<Program>();
 services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Trace));
 
 // Register an IChatClient
-var innerChatClient = new OllamaChatClient(new Uri("http://localhost:11434"), "llama3.1");
+var innerChatClient = new OllamaSharp.OllamaApiClient(new Uri("http://localhost:11434"), "llama3.1");
 services.AddChatClient(innerChatClient);
 
 // Run the app
