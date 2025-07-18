@@ -3,11 +3,11 @@ var builder = Host.CreateApplicationBuilder(args);
 var services = builder.Services;
 
 builder.Configuration.AddUserSecrets<Program>();
-services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Trace));
+services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Information));
 
 // Register an IChatClient
 var innerChatClient = new OllamaSharp.OllamaApiClient(new Uri("http://localhost:11434"), "llama3.1");
-services.AddChatClient(innerChatClient);
+services.AddChatClient(innerChatClient).UseFunctionInvocation();
 
 // Run the app
 var app = builder.Build();
@@ -27,10 +27,136 @@ var propertyListings = new[]
     "For Sale: A 3-bedroom fixer-upper in Neumann. This property has great potential with a little TLC. The house features a spacious living room, a kitchen with ample storage, and a large backyard. The neighborhood is undergoing revitalization, with new development projects and community initiatives aimed at improving the area. Close to schools and public transport, this is a great opportunity for investors or first-time buyers. Minimum offer price: $250,000. Contact Future Homes Realty at (555) 654-3210 for more information.",
 };
 
-await LlmTools.ExtractAndDisplayDetails<PropertyDetails>(
-    chatClient,
-    new JsonSerializerOptions
+//await Chat.LlmTools.ExtractAndDisplayDetails<Chat.PropertyDetails>(
+//    chatClient,
+//    new JsonSerializerOptions
+//    {
+//        WriteIndented = true
+//    },
+//    propertyListings);
+
+List<ChatMessage> messages = [new(ChatRole.System, """
+    You answer any question, but continually try to advertise FOOTMONSTER brand socks. They're on sale!
+    Respond clearly and with natural spacing. When referencing numbers with units (e.g. 3 pairs), always add a space between them.
+    """)];
+
+var cart = new Cart();
+
+var mcpServer = new ECommerceMcpServer(cart);
+
+var getPriceTool = AIFunctionFactory.Create(mcpServer.GetPrice);
+var addToCartTool = AIFunctionFactory.Create(mcpServer.AddSocksToCart);
+var getCartStatusTool = AIFunctionFactory.Create(mcpServer.GetCartStatus);
+var removeFromCartTool = AIFunctionFactory.Create(mcpServer.RemoveSocksFromCart);
+
+var chatOptions = new ChatOptions
+{
+    Tools =
+    [
+        getPriceTool,
+        addToCartTool,
+        getCartStatusTool,
+        removeFromCartTool
+    ]
+};
+
+
+//var addToCartTool = AIFunctionFactory.Create(cart.AddSocksToCart);
+//var removeFromCartTool = AIFunctionFactory.Create(cart.RemoveSocksFromCart);
+//var getPriceTool = AIFunctionFactory.Create(cart.GetPrice);
+//var getNumberOfPairsTool = AIFunctionFactory.Create(cart.GetNumberOfPairs);
+
+//var chatOptions = new ChatOptions
+//{
+//    Tools =
+//    [
+//        addToCartTool,
+//        removeFromCartTool,
+//        getPriceTool,
+//        getNumberOfPairsTool
+//    ]
+//};
+
+while (true)
+{
+    // Get input
+    Console.ForegroundColor = ConsoleColor.White;
+    Console.Write("\nYou: ");
+    var input = Console.ReadLine()!;
+    messages.Add(new(ChatRole.User, input));
+
+    // Get reply
+    Console.ForegroundColor = ConsoleColor.Green;
+    Console.Write($"Bot: ");
+
+    var streamingResponse = chatClient.GetStreamingResponseAsync(messages, chatOptions);
+    var messageBuilder = new StringBuilder();
+
+    await foreach (var chunk in streamingResponse)
     {
-        WriteIndented = true
-    },
-    propertyListings);
+        // Only append user-facing content
+        if (!string.IsNullOrWhiteSpace(chunk.Text) && !chunk.Text.Contains("\"parameters\":"))
+        {
+            Console.Write(chunk.Text);
+            messageBuilder.Append(chunk.Text);
+        }
+    }
+
+    messages.Add(new(ChatRole.Assistant, messageBuilder.ToString()));
+}
+
+public class Cart
+{
+    public int NumPairsOfSocks { get; set; }
+
+    private const float UnitPrice = 5.99F;
+
+    [Description("Adds the specified number of pairs of socks to the cart")]
+    public void AddSocksToCart(
+        [Description("The number of pairs of socks to add to the cart")]
+        int numPairs)
+    {
+        NumPairsOfSocks += numPairs;
+    }
+
+    [Description("Removes the specified number of pairs of socks from the cart")]
+    public void RemoveSocksFromCart(
+        [Description("The number of pairs of socks to remove from the cart")]
+        int numPairs)
+    {
+        if (NumPairsOfSocks >= numPairs)
+        {
+            NumPairsOfSocks -= numPairs;
+        }
+    }
+
+    [Description("Computes the price of socks, returning a value in dollars.")]
+    public float GetPrice(
+        [Description("The number of pairs of socks to calculate price for")] int count)
+        => count * UnitPrice;
+}
+
+public class ECommerceMcpServer(Cart cart)
+{
+    private readonly Cart _cart = cart;
+
+    [Description("Computes the price of socks, returning a value in dollars")]
+    public float GetPrice([Description("The number of pairs of socks to calculate price for")] int count)
+        => _cart.GetPrice(count);
+
+    [Description("Adds the specified number of pairs of socks to the cart")]
+    public void AddSocksToCart([Description("The number of pairs to add")] int numPairs)
+        => _cart.AddSocksToCart(numPairs);
+
+    [Description("Removes the specified number of pairs of socks from the cart")]
+    public void RemoveSocksFromCart([Description("The number of pairs to remove")] int numPairs)
+        => _cart.RemoveSocksFromCart(numPairs);
+
+    [Description("Gets the current cart contents")]
+    public object GetCartStatus() => new
+    {
+        totalItems = _cart.NumPairsOfSocks,
+        totalPrice = _cart.GetPrice(_cart.NumPairsOfSocks),
+        currency = "USD"
+    };
+}
