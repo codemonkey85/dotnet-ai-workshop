@@ -33,29 +33,36 @@ var propertyListings = new[]
     "For Sale: A 3-bedroom fixer-upper in Neumann. This property has great potential with a little TLC. The house features a spacious living room, a kitchen with ample storage, and a large backyard. The neighborhood is undergoing revitalization, with new development projects and community initiatives aimed at improving the area. Close to schools and public transport, this is a great opportunity for investors or first-time buyers. Minimum offer price: $250,000. Contact Future Homes Realty at (555) 654-3210 for more information.",
 };
 
-var jsonShape = GenerateJsonShape<PropertyDetails>();
-var systemMessage = $$"""
+var jsonSerializerOptions = new JsonSerializerOptions { WriteIndented = true };
+
+await ExtractAndDisplayDetails<PropertyDetails>(chatClient, jsonSerializerOptions, inputs: propertyListings);
+
+static async Task ExtractAndDisplayDetails<T>(IChatClient chatClient, JsonSerializerOptions? jsonSerializerOptions = null, params string[] inputs)
+{
+    var jsonShape = GenerateJsonShape<T>();
+    var systemMessage = $$"""
     Extract information from the following text.
 
     Respond in JSON with the following shape:
     {{jsonShape}}
     """;
 
-foreach (var listingText in propertyListings)
-{
-    var response = await chatClient.GetResponseAsync<PropertyDetails>(
-    [
-        new(ChatRole.System, systemMessage),
+    foreach (var listingText in inputs)
+    {
+        var response = await chatClient.GetResponseAsync<T>(
+        [
+            new(ChatRole.System, systemMessage),
         new(ChatRole.User, listingText)
-    ]);
+        ]);
 
-    if (response.TryGetResult(out var info))
-    {
-        Console.WriteLine(JsonSerializer.Serialize(info, PropertyDetailsJsonContext.Default.PropertyDetails));
-    }
-    else
-    {
-        Console.WriteLine("Response was not in the expected format.");
+        if (response.TryGetResult(out var info))
+        {
+            Console.WriteLine(JsonSerializer.Serialize(info, options: jsonSerializerOptions));
+        }
+        else
+        {
+            Console.WriteLine("Response was not in the expected format.");
+        }
     }
 }
 
@@ -111,9 +118,3 @@ internal class PropertyDetails
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 internal enum ListingType { Sale, Rental }
-
-[JsonSerializable(typeof(PropertyDetails))]
-[JsonSourceGenerationOptions(WriteIndented = true)]
-internal partial class PropertyDetailsJsonContext : JsonSerializerContext
-{
-}
