@@ -1,14 +1,16 @@
 ﻿// Set up DI etc
-var hostBuilder = Host.CreateApplicationBuilder(args);
-hostBuilder.Configuration.AddUserSecrets<Program>();
-hostBuilder.Services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Trace));
+var builder = Host.CreateApplicationBuilder(args);
+var services = builder.Services;
+
+builder.Configuration.AddUserSecrets<Program>();
+services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Trace));
 
 // Register an IChatClient
 var innerChatClient = new OllamaChatClient(new Uri("http://localhost:11434"), "llama3.1");
-hostBuilder.Services.AddChatClient(innerChatClient);
+services.AddChatClient(innerChatClient);
 
 // Run the app
-var app = hostBuilder.Build();
+var app = builder.Build();
 var chatClient = app.Services.GetRequiredService<IChatClient>();
 
 var propertyListings = new[]
