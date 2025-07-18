@@ -6,7 +6,9 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Microsoft.Extensions.AI;
+#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 // This isn't a feature we're planning to ship, but demonstrates how custom clients can layer in
 // non-trivial functionality. In this case we're able to upgrade non-function-calling models to
@@ -23,7 +25,10 @@ public static class UsePromptBasedFunctionCallingStep
     internal sealed class PromptBasedFunctionCallingChatClient(IChatClient innerClient)
     : DelegatingChatClient(innerClient)
     {
-        private const string MessageIntro = "You are an AI model with function calling capabilities. Call one or more functions if they are relevant to the user's query.";
+        private const string MessageIntro = """
+            You are an AI model with function calling capabilities.
+            Call one or more functions if they are relevant to the user's query.
+            """;
 
         private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
         {
@@ -31,13 +36,20 @@ public static class UsePromptBasedFunctionCallingStep
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         };
 
-        public override async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> chatMessages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        public override async Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> chatMessages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
         {
             // Our goal is to convert tools into a prompt describing them, then to detect tool calls in the
             // response and convert those into FunctionCallContent.
             if (options?.Tools is { Count: > 0 })
             {
-                List<ChatMessage> chatMessagesList = [CreateToolPrompt(options.Tools), .. chatMessages.Select(m => m.Clone())];
+                List<ChatMessage> chatMessagesList =
+                [
+                    CreateToolPrompt(options.Tools),
+                    .. chatMessages.Select(m => m.Clone())
+                ];
                 chatMessages = chatMessagesList;
                 options = options.Clone();
                 options.Tools = null;
@@ -59,13 +71,25 @@ public static class UsePromptBasedFunctionCallingStep
                     {
                         if (message.Contents[itemIndex] is FunctionResultContent frc)
                         {
-                            var toolCallResultJson = JsonSerializer.Serialize(new ToolCallResult { Id = frc.CallId, Result = frc.Result }, _jsonOptions);
-                            chatMessagesList[messageIndex] = new ChatMessage(ChatRole.User, $"<tool_call_result>{toolCallResultJson}</tool_call_result>");
+                            var toolCallResultJson = JsonSerializer.Serialize(new ToolCallResult
+                            {
+                                Id = frc.CallId,
+                                Result = frc.Result
+                            }, _jsonOptions);
+
+                            chatMessagesList[messageIndex] =
+                                new ChatMessage(ChatRole.User, $"<tool_call_result>{toolCallResultJson}</tool_call_result>");
                         }
                         else if (message.Contents[itemIndex] is FunctionCallContent fcc)
                         {
-                            var toolCallJson = JsonSerializer.Serialize(new { fcc.CallId, fcc.Name, fcc.Arguments }, _jsonOptions);
-                            chatMessagesList[messageIndex] = new ChatMessage(ChatRole.Assistant, $"<tool_call_json>{toolCallJson}</tool_call_json>");
+                            var toolCallJson = JsonSerializer.Serialize(new
+                            {
+                                fcc.CallId,
+                                fcc.Name,
+                                fcc.Arguments
+                            }, _jsonOptions);
+                            chatMessagesList[messageIndex] =
+                                new ChatMessage(ChatRole.Assistant, $"<tool_call_json>{toolCallJson}</tool_call_json>");
                         }
                     }
                 }
@@ -106,7 +130,11 @@ public static class UsePromptBasedFunctionCallingStep
                                 }
 
                                 var id = Guid.NewGuid().ToString().Substring(0, 6);
-                                message.Contents.Add(new FunctionCallContent(id, toolCallParsed.Name!, toolCallParsed.Arguments is { } args ? new ReadOnlyDictionary<string, object?>(args) : null));
+                                message.Contents.Add(
+                                    new FunctionCallContent(
+                                        id,
+                                        toolCallParsed.Name!,
+                                        toolCallParsed.Arguments is { } args ? new ReadOnlyDictionary<string, object?>(args) : null));
 
                                 if (contentItem is not null)
                                 {
