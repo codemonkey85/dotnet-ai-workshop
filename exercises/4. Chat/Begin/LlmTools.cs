@@ -2,7 +2,10 @@
 
 public static class LlmTools
 {
-    public static async Task ExtractAndDisplayDetails<T>(IChatClient chatClient, JsonSerializerOptions? jsonSerializerOptions = null, params string[] inputs)
+    public static async Task ExtractAndDisplayDetails<T>(
+        IChatClient chatClient,
+        JsonSerializerOptions? jsonSerializerOptions = null,
+        params string[] inputs)
     {
         var jsonShape = JsonTools.GenerateJsonShape<T>();
         var systemMessage = $$"""
@@ -11,12 +14,12 @@ public static class LlmTools
             {{jsonShape}}
             """;
 
-        foreach (var listingText in inputs)
+        foreach (var inputText in inputs)
         {
             var response = await chatClient.GetResponseAsync<T>(
             [
                 new(ChatRole.System, systemMessage),
-                new(ChatRole.User, listingText)
+                new(ChatRole.User, inputText)
             ]);
 
             if (response.TryGetResult(out var info))
