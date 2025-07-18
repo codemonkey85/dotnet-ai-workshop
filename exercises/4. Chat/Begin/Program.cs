@@ -7,7 +7,9 @@ services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Inf
 
 // Register an IChatClient
 var innerChatClient = new OllamaSharp.OllamaApiClient(new Uri("http://localhost:11434"), "llama3.1");
-services.AddChatClient(innerChatClient).UseFunctionInvocation();
+services.AddChatClient(innerChatClient)
+    .UseFunctionInvocation()
+    .UsePromptBasedFunctionCalling();
 
 // Run the app
 var app = builder.Build();
