@@ -9,21 +9,36 @@ var builder = WebApplication.CreateBuilder(args);
 //  - It can be any IChatClient implementation, for example AzureOpenAIClient or OllamaChatClient
 //  - See instructions for sample code
 // Note that AzureOpenAIClient works with both GitHub Models and Azure OpenAI endpoints
-var aiEndpoint = builder.Configuration["AI:Endpoint"];
-if (string.IsNullOrEmpty(aiEndpoint))
-{
-    throw new InvalidOperationException("AI:Endpoint configuration is required.");
-}
-var aiKey = builder.Configuration["AI:Key"];
-if (string.IsNullOrEmpty(aiKey))
-{
-    throw new InvalidOperationException("AI:Key configuration is required.");
-}
 
-var innerChatClient = new AzureOpenAIClient(
-    new Uri(aiEndpoint),
-    new ApiKeyCredential(aiKey))
-    .GetChatClient("gpt-4o-mini").AsIChatClient();
+var useGitHubModels = builder.Configuration.GetValue("UseGitHubModels", false);
+IChatClient innerChatClient;
+
+if (useGitHubModels)
+{
+    const string gitHubAiConfigurationSection = "GitHubAI";
+
+    var aiEndpoint = builder.Configuration[$"{gitHubAiConfigurationSection}:Endpoint"];
+    if (string.IsNullOrEmpty(aiEndpoint))
+    {
+        throw new InvalidOperationException($"{gitHubAiConfigurationSection}:Endpoint configuration is required.");
+    }
+
+    var aiKey = builder.Configuration[$"{gitHubAiConfigurationSection}:Key"];
+    if (string.IsNullOrEmpty(aiKey))
+    {
+        throw new InvalidOperationException($"{gitHubAiConfigurationSection}:Key configuration is required.");
+    }
+
+    innerChatClient = new AzureOpenAIClient(
+        new Uri(aiEndpoint),
+        new ApiKeyCredential(aiKey))
+        .GetChatClient("gpt-4o-mini").AsIChatClient();
+}
+else
+{
+    innerChatClient = new OllamaChatClient(
+        new Uri("http://127.0.0.1:11434"), "llama3.1");
+}
 
 builder.Services.AddChatClient(innerChatClient);
 
