@@ -1,12 +1,4 @@
-﻿using System.Text.Json;
-using System.Text.Json.Serialization;
-using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-
-// Set up DI etc
+﻿// Set up DI etc
 var hostBuilder = Host.CreateApplicationBuilder(args);
 hostBuilder.Configuration.AddUserSecrets<Program>();
 hostBuilder.Services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Trace));
@@ -33,88 +25,10 @@ var propertyListings = new[]
     "For Sale: A 3-bedroom fixer-upper in Neumann. This property has great potential with a little TLC. The house features a spacious living room, a kitchen with ample storage, and a large backyard. The neighborhood is undergoing revitalization, with new development projects and community initiatives aimed at improving the area. Close to schools and public transport, this is a great opportunity for investors or first-time buyers. Minimum offer price: $250,000. Contact Future Homes Realty at (555) 654-3210 for more information.",
 };
 
-var jsonSerializerOptions = new JsonSerializerOptions { WriteIndented = true };
-
-await ExtractAndDisplayDetails<PropertyDetails>(chatClient, jsonSerializerOptions, inputs: propertyListings);
-
-static async Task ExtractAndDisplayDetails<T>(IChatClient chatClient, JsonSerializerOptions? jsonSerializerOptions = null, params string[] inputs)
-{
-    var jsonShape = GenerateJsonShape<T>();
-    var systemMessage = $$"""
-    Extract information from the following text.
-
-    Respond in JSON with the following shape:
-    {{jsonShape}}
-    """;
-
-    foreach (var listingText in inputs)
+await LlmTools.ExtractAndDisplayDetails<PropertyDetails>(
+    chatClient,
+    new JsonSerializerOptions
     {
-        var response = await chatClient.GetResponseAsync<T>(
-        [
-            new(ChatRole.System, systemMessage),
-        new(ChatRole.User, listingText)
-        ]);
-
-        if (response.TryGetResult(out var info))
-        {
-            Console.WriteLine(JsonSerializer.Serialize(info, options: jsonSerializerOptions));
-        }
-        else
-        {
-            Console.WriteLine("Response was not in the expected format.");
-        }
-    }
-}
-
-static string GenerateJsonShape<T>()
-{
-    string GetJsonType(Type t)
-    {
-        t = Nullable.GetUnderlyingType(t) ?? t;
-
-        return t switch
-        {
-            var type when type.IsEnum => "string", // Will be serialized as a string due to JsonStringEnumConverter
-            var type when type == typeof(string) => "string",
-            var type when type == typeof(int) || type == typeof(long) || type == typeof(float) || type == typeof(double) || type == typeof(decimal) => "number",
-            var type when type == typeof(bool) => "boolean",
-            var type when type.IsArray => $"[{GetJsonType(type.GetElementType()!)}]",
-            _ => "object"
-        };
-    }
-
-    string GetEnumComment(Type t)
-    {
-        t = Nullable.GetUnderlyingType(t) ?? t;
-        return t.IsEnum
-            ? $" // one of: {string.Join(", ", Enum.GetNames(t).Select(n => $"\"{n}\""))}"
-            : string.Empty;
-    }
-
-    var type = typeof(T);
-
-    var props = type.GetProperties();
-    var lines = props.Select(p =>
-    {
-        var name = p.Name;
-        var jsonType = GetJsonType(p.PropertyType);
-        var comment = GetEnumComment(p.PropertyType);
-        return $"  \"{name}\": {jsonType}{comment}";
-    });
-
-    return $"{{\n{string.Join(",\n", lines)}\n}}";
-}
-
-internal class PropertyDetails
-{
-    public ListingType ListingType { get; set; }
-    public required string Neighbourhood { get; set; }
-    public int NumBedrooms { get; set; }
-    public int Price { get; set; }
-    public required string[] Amenities { get; set; }
-    public required string TenWordSummary { get; set; }
-    public required string ContactInfo { get; set; }
-}
-
-[JsonConverter(typeof(JsonStringEnumConverter))]
-internal enum ListingType { Sale, Rental }
+        WriteIndented = true
+    },
+    propertyListings);
