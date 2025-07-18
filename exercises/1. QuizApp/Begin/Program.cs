@@ -37,7 +37,7 @@ if (useGitHubModels)
 else
 {
     innerChatClient = new OllamaSharp.OllamaApiClient(
-        new Uri("http://127.0.0.1:11434"), "llama3.1");
+        new Uri("http://localhost:11434"), "llama3.1");
 }
 
 builder.Services.AddChatClient(innerChatClient);
