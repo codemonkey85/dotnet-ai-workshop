@@ -6,7 +6,7 @@ You're going to use FAISS to build an index of many thousands of GitHub issue ti
 
 ## Open the project
 
-Open the project `exercises/Embeddings/Begin`.
+Open the project `exercises/2. Embeddings/Begin`.
 
 In `Program.cs`, ensure only `FaissSemanticSearch` is uncommented:
 
@@ -72,7 +72,7 @@ while (true)
     var input = Console.ReadLine()!;
     if (input == "") break;
 
-    var inputEmbedding = await EmbeddingGenerator.GenerateEmbeddingVectorAsync(input);
+    var inputEmbedding = await EmbeddingGenerator.GenerateVectorAsync(input);
     var (resultDistances, resultIds) = index.SearchFlat(1, inputEmbedding.ToArray(), 3);
     for (var i = 0; i < resultDistances.Length; i++)
     {
